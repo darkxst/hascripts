@@ -1,0 +1,47 @@
+blueprint:
+  name: Interval Power Cycle
+  description: Turn a device based on a timed interval
+  domain: automation
+  input:
+    duration:
+      name: Duration
+      description: Length of runtime
+      selector:
+        entity:
+          domain: input_number
+    interval:
+      name: Interval
+      description: cycle time
+      selector:
+        entity:
+          domain: input_number
+    fan_id:
+      name: Device(s)
+      description: Device to control
+      selector:
+        target:
+          entity:
+            domain: switch
+variables:
+  duration: !input duration
+  interval: !input interval
+  test: "This is a variable"
+
+trigger:
+  - platform: time_pattern
+    minutes: "/1"
+
+condition:
+  - condition: template
+    value_template: "{{ now().minute % states(interval)|int == 0 }}"
+
+action:
+  - service: logbook.log
+    data:
+      name: "{{ test }}"
+      message: "Starting interval {{ states(duration) | int * 60 }} {{ states(interval) | int | string }}"
+  - service: switch.turn_on
+    target: !input fan_id
+  - delay: "{{ states(duration) | int * 60 }}"
+  - service: switch.turn_off
+    target: !input fan_id

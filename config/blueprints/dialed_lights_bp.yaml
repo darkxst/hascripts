@@ -1,0 +1,58 @@
+blueprint:
+  name: Scheduled Daily Light Cycle
+  description: Turn a light on daily based on input helpers
+  domain: automation
+  input:
+    switch_on:
+      name: Turn On
+      description: Time to switch device on
+      selector:
+        entity:
+          domain: input_datetime
+    switch_off:
+      name: Turn Off
+      description: Time to switch device off
+      selector:
+        entity:
+          domain: input_datetime
+    switch_id:
+      name: Device(s)
+      description: Device(s) to control
+      selector:
+        target:
+          entity:
+            domain: switch
+
+trigger:
+  - platform: time
+    at: !input switch_on
+    id: bp01on
+  - platform: time
+    at: !input switch_off
+    id: bp01off
+
+action:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: bp01on
+      sequence:
+      - service: script.turn_on
+        data:
+          variables:
+            switch_id: !input switch_id
+            svc: switch.turn_on
+        target:
+          entity_id: script.wait_for
+    - conditions:
+      - condition: trigger
+        id: bp01off
+      sequence:
+      - service: script.turn_on
+        data:
+          variables:
+            switch_id: !input switch_id
+            svc: switch.turn_off
+        target:
+          entity_id: script.wait_for
+    default: []
