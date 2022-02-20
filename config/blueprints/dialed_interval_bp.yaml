@@ -25,7 +25,6 @@ blueprint:
 variables:
   duration: !input duration
   interval: !input interval
-  test: "This is a variable"
 
 trigger:
   - platform: time_pattern
@@ -36,10 +35,6 @@ condition:
     value_template: "{{ now().minute % states(interval)|int == 0 }}"
 
 action:
-  - service: logbook.log
-    data:
-      name: "{{ test }}"
-      message: "Starting interval {{ states(duration) | int * 60 }} {{ states(interval) | int | string }}"
   - service: switch.turn_on
     target: !input fan_id
   - delay: "{{ states(duration) | int * 60 }}"
