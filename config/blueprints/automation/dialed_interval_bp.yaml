@@ -17,7 +17,7 @@ blueprint:
           domain: input_number
     condition_entity:
       name: Condition
-      description: Conditional only run if entity ID is active
+      description: Conditional, only run if entity ID is currently active
       default: {}
       selector:
         entity:
