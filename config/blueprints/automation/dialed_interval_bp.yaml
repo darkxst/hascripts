@@ -15,6 +15,13 @@ blueprint:
       selector:
         entity:
           domain: input_number
+    condition_entity:
+      name: Condition
+      description: Conditional only run if entity ID is active
+      default: {}
+      selector:
+        entity:
+          domain: switch
     fan_id:
       name: Device(s)
       description: Device to control
@@ -25,6 +32,7 @@ blueprint:
 variables:
   duration: !input duration
   interval: !input interval
+  condition_entity: !input condition_entity
 
 trigger:
   - platform: time_pattern
@@ -32,7 +40,9 @@ trigger:
 
 condition:
   - condition: template
-    value_template: "{{ now().minute % states(interval)|int == 0 }}"
+    value_template: >-
+      {{ now().minute % states(interval)|int == 0 and 
+         (states(condition_entity) == 'on' or states(condition_entity) == 'unknown')}}
 
 action:
   - service: switch.turn_on
