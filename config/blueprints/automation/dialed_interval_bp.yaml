@@ -41,8 +41,8 @@ trigger:
 condition:
   - condition: template
     value_template: >-
-      {{ now().minute % states(interval)|int == 0 and 
-         (states(condition_entity) == 'on' or states(condition_entity) == 'unknown')}}
+      {{ now().minute % states(interval)|int == 0 
+         and (states(condition_entity) == 'on' or states(condition_entity) == 'unknown')}}
 
 action:
   - service: switch.turn_on
