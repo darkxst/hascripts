@@ -3,14 +3,14 @@ wait_for:
   description: "check if device is unavailable before sending state update"
   variables:
     svc: switch.turn_on
-    switch_id: switch.mqtt_1bc878_rl_5
+    switch_id: switch.entity
   sequence:
   - choose:
     - conditions: "{{ is_state(switch_id, 'unavailable')}}"
       sequence:
       - service: logbook.log
         data:
-          name: "{{ states(switch_id) }}"
+          name: "{{ switch_id }}"
           message: "Switch {{ states(switch_id) }} unavailable"
       - wait_for_trigger:
         - platform: template
@@ -19,10 +19,10 @@ wait_for:
           value_template: "{{ is_state(switch_id, 'off') }}"
       - service: logbook.log
         data:
-          name: "{{ states(switch_id) }}"
+          name: "{{ switch_id }}"
           message: "Switch {{ states(switch_id) }} came back online, continuing"
     default: []
-  - service: "{{ states(svc) }}"
-    target: "{{ states(switch_id) }}"
+  - service: "{{ svc }}"
+    target: "{{ switch_id }}"
   mode: single
   icon: mdi:camera-timer
