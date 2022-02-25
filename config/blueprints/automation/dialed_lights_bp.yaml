@@ -22,6 +22,8 @@ blueprint:
         target:
           entity:
             domain: switch
+variables:
+  input_id: !input switch_id
 
 trigger:
   - platform: time

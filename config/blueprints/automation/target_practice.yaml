@@ -1,0 +1,31 @@
+blueprint:
+  name: target selector
+  description: test target selector 
+  domain: automation
+  input:
+    switch_id:
+      name: Device(s)
+      description: Device(s) to control
+      selector:
+        target:
+          entity:
+            domain: switch
+
+variables:
+  input_id: !input switch_id
+
+trigger:
+  - platform: time_pattern
+    hours: /1
+
+action:
+  - service: persistent_notification.create
+    data:
+      message: '{{ input_id }}'
+  - service: script.turn_on
+    data:
+      variables:
+        switch_id: '{{ input_id }}'
+        svc: switch.turn_on
+    target:
+      entity_id: script.wait_for
