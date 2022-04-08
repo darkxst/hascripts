@@ -24,5 +24,5 @@ wait_for:
     default: []
   - service: "{{ svc }}"
     target: "{{ switch_id }}"
-  mode: single
+  mode: queued
   icon: mdi:camera-timer
