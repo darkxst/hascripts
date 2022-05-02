@@ -60,7 +60,7 @@
 
 
 #ifdef FIRMWARE_ATHOM
-  #define USER_TEMPLATE     "{\"NAME\":\"Athom Plug V2\",\"GPIO":[0,0,0,3104,0,32,0,0,224,576,0,0,0,0],"FLAG":0,"BASE":18}"
+  #define USER_TEMPLATE     "{\"NAME\":\"Athom Plug V2\",\"GPIO\":[0,0,0,3104,0,32,0,0,224,576,0,0,0,0],\"FLAG\":0,\"BASE\":18}"
   #define MODULE            USER_MODULE
 #endif
 
@@ -78,7 +78,13 @@
   #define MQTT_USER         "mqtt"         // [MqttUser] Optional user
 
   #undef  MQTT_PASS
-  #define MQTT_PASS         "mqtt"         // [MqttPassword] Optional password
+  #define MQTT_PASS         "mqtts"         // [MqttPassword] Optional password
+#endif
+
+//Will need to override OTA for each build to pick up our firmware on update
+#ifdef FIRMWARE_USEE
+  #undef OTA_URL
+  #define OTA_URL           "https://github.com/darkxst/hascripts/blob/main/config/tasmota/firmware-useelink.bin.gz?raw=true"  // [OtaUrl]
 #endif
 
 #endif  // _USER_CONFIG_OVERRIDE_H_
