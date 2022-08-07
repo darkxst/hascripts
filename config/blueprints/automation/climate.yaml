@@ -1,0 +1,81 @@
+blueprint:
+  name: Climate 
+  description: Turn a device based on a temperature - heat only
+  domain: automation
+  input:
+    setTemp:
+      name: Set Temparture
+      description: Set Point Temperature °C
+      selector:
+        entity:
+          domain: input_number
+    deltaTemp:
+      name: Delta Temp
+      description: Temperature Delta °C (turn on below this)
+      selector:
+        entity:
+          domain: input_number
+    sensor:
+      name: Temperature Sensor
+      description: sensor to monitor temperature in°C
+      selector:
+        entity:
+          domain: sensor
+    power_id:
+      name: Heater Device(s)
+      description: Device to control
+      selector:
+        entity:
+          domain: switch
+
+variables:
+  # Temp: !input sensor
+  Ts: !input setTemp
+  Td: !input deltaTemp
+  Power: !input power_id
+
+
+  TCurrent: "{{trigger.to_state.state | float}}"
+  # TCurrent: "{{states(Temp) | float}}"
+  TCurrentTr: "{{trigger.to_state.state | float}}"
+  THigh: "{{states(Ts) | float}}"
+  TLow: "{{THigh - states(Td) | float }}"
+
+trigger:
+  - platform: state
+    entity_id:
+      - !input sensor
+
+condition: []
+
+action: 
+  - service: notify.persistent_notification
+    data:
+      message: "climateT {{ TCurrent }} {{ states(Power) }}"
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: !input power_id
+        state: "on"
+      - condition: template
+        value_template: "{{ TCurrent  > THigh }}"
+      sequence:
+        - service: notify.persistent_notification
+          data:
+            message: Temp High blueprint
+        - service: switch.turn_off
+          entity_id: !input power_id
+    - conditions:
+      - condition: state
+        entity_id: !input power_id
+        state: "off"
+      - condition: template
+        value_template: "{{ TCurrent < TLow }}"
+      sequence:
+        - service: notify.persistent_notification
+          data:
+            message: Temp Low blueprint
+        - service: switch.turn_on
+          entity_id: !input power_id
+
+
