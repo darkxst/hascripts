@@ -32,7 +32,7 @@ variables:
   Ts: !input setTemp
   Td: !input deltaTemp
   Power: !input power_id
-
+  debug: false
 
   TCurrent: "{{trigger.to_state.state | float}}"
   THigh: "{{states(Ts) | float}}"
@@ -45,10 +45,15 @@ trigger:
 
 condition: []
 
-action: 
-  - service: notify.persistent_notification
-    data:
-      message: "climateT {{ TCurrent }} {{ states(Power) }}"
+action:
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: "{{debug}}"
+      sequence:
+        - service: notify.persistent_notification
+          data:
+            message: "climateT {{ TCurrent }} {{ states(Power) }}"
   - choose:
     - conditions:
       - condition: state
@@ -57,9 +62,14 @@ action:
       - condition: template
         value_template: "{{ TCurrent  > THigh }}"
       sequence:
-        - service: notify.persistent_notification
-          data:
-            message: Temp High blueprint
+        - choose:
+          - conditions:
+            - condition: template
+              value_template: "{{debug}}"
+            sequence:
+              - service: notify.persistent_notification
+                data:
+                  message: Temp High blueprint
         - service: switch.turn_off
           entity_id: !input power_id
     - conditions:
@@ -69,10 +79,13 @@ action:
       - condition: template
         value_template: "{{ TCurrent < TLow }}"
       sequence:
-        - service: notify.persistent_notification
-          data:
-            message: Temp Low blueprint
+        - choose:
+          - conditions:
+            - condition: template
+              value_template: "{{debug}}"
+            sequence:
+              - service: notify.persistent_notification
+                data:
+                  message: Temp Low blueprint
         - service: switch.turn_on
           entity_id: !input power_id
-
-
