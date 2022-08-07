@@ -29,15 +29,12 @@ blueprint:
           domain: switch
 
 variables:
-  # Temp: !input sensor
   Ts: !input setTemp
   Td: !input deltaTemp
   Power: !input power_id
 
 
   TCurrent: "{{trigger.to_state.state | float}}"
-  # TCurrent: "{{states(Temp) | float}}"
-  TCurrentTr: "{{trigger.to_state.state | float}}"
   THigh: "{{states(Ts) | float}}"
   TLow: "{{THigh - states(Td) | float }}"
 
