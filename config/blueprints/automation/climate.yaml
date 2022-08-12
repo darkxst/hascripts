@@ -69,7 +69,7 @@ action:
             sequence:
               - service: notify.persistent_notification
                 data:
-                  message: Temp High blueprint
+                  message: Temp high blueprint
         - service: switch.turn_off
           entity_id: !input power_id
     - conditions:
@@ -77,7 +77,7 @@ action:
         entity_id: !input power_id
         state: "off"
       - condition: template
-        value_template: "{{ TCurrent < TLow }}"
+        value_template: "{{ TCurrent <= TLow }}"
       sequence:
         - choose:
           - conditions:
@@ -86,6 +86,6 @@ action:
             sequence:
               - service: notify.persistent_notification
                 data:
-                  message: Temp Low blueprint
+                  message: Temp low blueprint
         - service: switch.turn_on
           entity_id: !input power_id
