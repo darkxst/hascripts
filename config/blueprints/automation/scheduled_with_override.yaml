@@ -1,0 +1,86 @@
+blueprint:
+  name: Scheduled Daily Cycle With Overide
+  description: Turn a device on daily based on input helpers with MQTT button override
+  domain: automation
+  input:
+    switch_on:
+      name: Time On
+      description: Time to switch device on
+      selector:
+        entity:
+          domain: input_datetime
+    switch_off:
+      name: Time Off
+      description: Time to switch device off
+      selector:
+        entity:
+          domain: input_datetime
+    switch_id:
+      name: Device(s)
+      description: Device(s) to control
+      selector:
+          entity:
+            domain: switch
+    switch_override:
+      name: Override
+      description: Override switch to disable timed automation
+      selector:
+        entity:
+          domain: input_boolean
+    mqtt_topic:
+      name: Topic
+      description: Mqtt Topic to subscribe
+      selector:
+        text:
+
+variables:
+  input_id: !input switch_id
+
+trigger:
+  - platform: time
+    at: 
+      - !input switch_on
+      - !input switch_off
+    id: time
+  - platform: mqtt
+    topic: !input mqtt_topic
+    payload: true
+    value_template: |
+      {{ value_json.Button1 is defined }}
+    id: override
+
+condition: []
+
+action:
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: time
+      - condition: state
+        entity_id: !input switch_override
+        state: "off"
+      sequence:
+        - service: |
+            {% if 'on' in trigger.entity_id %}
+              switch.turn_on
+            {% else %}
+              switch.turn_off
+            {% endif %}
+          data: {}
+          target:
+            entity_id: !input switch_id
+    - conditions:
+      - condition: trigger
+        id: override
+      sequence:
+        - service: |
+            {% if trigger.payload_json["Button1"]["Action"] == "HOLD" %}
+              input_boolean.turn_on
+            {% elif trigger.payload_json["Button1"]["Action"] == "SINGLE" %}
+              input_boolean.turn_off
+            {% else %}
+              homeassistant.update_entity
+            {% endif %}
+          data: {}
+          target:
+            entity_id: !input switch_override
