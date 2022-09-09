@@ -21,7 +21,7 @@ blueprint:
       selector:
           entity:
             domain: switch
-    switch_override:
+    switch_overide:
       name: Override
       description: Override switch to disable timed automation
       selector:
@@ -54,11 +54,11 @@ condition: []
 action:
   - choose:
     - conditions:
-      - condition: trigger
-        id: time
-      - condition: state
-        entity_id: !input switch_override
-        state: "off"
+        - condition: trigger
+          id: time
+        - condition: state
+          entity_id: !input switch_override
+          state: "off"
       sequence:
         - service: |
             {% if 'on' in trigger.entity_id %}
@@ -70,8 +70,8 @@ action:
           target:
             entity_id: !input switch_id
     - conditions:
-      - condition: trigger
-        id: override
+        - condition: trigger
+          id: override
       sequence:
         - service: |
             {% if trigger.payload_json["Button1"]["Action"] == "HOLD" %}
@@ -84,4 +84,4 @@ action:
           data: {}
           target:
             entity_id: !input switch_override
-mode: queued
+    default: []
