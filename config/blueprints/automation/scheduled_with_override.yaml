@@ -7,7 +7,7 @@ blueprint:
       name: Times
       description: >-
         Select helpers to set times to turn on or off. Multiples supported.
-        Must include 'on' or 'off' strings in the entity name.
+        Must include 'on' or 'off' (but not both) strings in the entity name.
       selector:
         entity:
           multiple: true
@@ -16,8 +16,9 @@ blueprint:
       name: Device(s)
       description: Device(s) to control
       selector:
-        entity:
-          domain: switch
+        target:
+          entity:
+            domain: switch
     switch_override:
       name: Override
       description: Override switch to disable timed automation
@@ -45,6 +46,7 @@ trigger:
 variables:
   action: |
     {{ trigger.payload_json["Button1"]["Action"] if trigger.payload is defined else none }}
+
 condition: []
 action:
   - choose:
@@ -65,8 +67,7 @@ action:
                 switch.turn_off
               {% endif %}
             data: {}
-            target:
-              entity_id: !input switch_id
+            target: !input switch_id
       - conditions:
           - condition: trigger
             id: override
