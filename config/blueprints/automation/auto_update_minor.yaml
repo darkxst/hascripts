@@ -1,0 +1,107 @@
+blueprint:
+  name: Auto Update
+  description: >
+    Auto update on minor releases only, this will ignore major updates
+    that will likely contain breaking changes. It will also skip auto updates
+    of beta releases if you are on the Home Assistant beta channel.
+
+    v0.1
+  domain: automation
+  input:
+    updates:
+      name: Addon Updates
+      description: Addons to update that use X.Y.0 versioning for major releases
+      default:
+        - update.mosquitto_broker_update
+        - update.terminal_ssh_update
+      selector:
+        entity:
+          multiple: true
+          domain: update
+    updates_2nd:
+      name: Addon Updates 2nd
+      description: Addons to update that use X.0.0 versioning for major releases
+      default:
+        - update.studio_code_server_update
+      selector:
+        entity:
+          multiple: true
+          domain: update
+    core:
+      name: Core Updates
+      description: |
+        Update core components that auto-restart on update these are run last
+      default:
+        - update.home_assistant_core_update
+      selector:
+        entity:
+          multiple: true
+          domain: update
+    update_time:
+      name: Update time
+      description: >-
+        Time to run updates, may cause a restart so best to run when quiet
+        i.e. during the night
+      default: "02:00:00"
+      selector:
+        time:
+trigger:
+  - platform: time
+    at: !input update_time
+
+condition: []
+
+variables:
+  list_data:
+    update_list: !input updates
+    update_list_2nd: !input updates_2nd
+    core_list: !input core
+  regex_map:
+    one: .0[b-]?[0-9]?$
+    two: .0.0$
+
+action:
+  - repeat:
+      for_each: |
+        {{ list_data.keys() | list }}
+      sequence:
+        - variables:
+            regex: >
+              {{ regex_map.two if repeat.item is search('2nd$')  else
+              regex_map.one }}
+            pending_list: |
+              {{ states.update  | selectattr('state', 'eq', 'on') 
+                | selectattr('entity_id', 'in', list_data.get(repeat.item,  None))
+                | rejectattr('attributes.latest_version', 'search', regex) 
+                | map(attribute='entity_id') | list }}
+        - service: logbook.log
+          data:
+            name: Auto-update
+            domain: update
+            entity_id: "{{ this.entity_id }}"
+            message: |
+              Processing {{ repeat.item }},
+              Pending: {{pending_list if pending_list | count >= 1 else 'None'}}
+        - condition: "{{ pending_list | count >= 1 }}"
+        - service: update.install
+          data:
+            backup: true
+          target:
+            entity_id: "{{ pending_list }}"
+        - wait_template: >-
+            {{ ( states.update  | selectattr('state', 'eq', 'on') |
+            selectattr('entity_id', 'in', pending_list ) | list | count ) < 1 }}
+          continue_on_timeout: true
+          timeout:
+            minutes: 30
+        - service: logbook.log
+          data:
+            name: Auto-update
+            domain: update
+            entity_id: "{{ this.entity_id }}"
+            message: |
+              {% if wait.completed %}
+                Completed updating: {{ pending_list }}
+              {% else %}
+                {{ pending_list }} Timeout
+              {% endif %}
