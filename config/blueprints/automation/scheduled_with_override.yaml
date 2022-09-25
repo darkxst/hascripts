@@ -1,6 +1,10 @@
 blueprint:
   name: Scheduled Daily Cycle With Overide
-  description: Turn a device on daily based on input helpers with MQTT button override
+  description: >
+    Turn a device on daily based on input helpers with MQTT button override
+    and manual timer
+
+    v0.0.2
   domain: automation
   input:
     switch_time:
@@ -25,6 +29,12 @@ blueprint:
       selector:
         entity:
           domain: input_boolean
+    timer:
+      name: Timer
+      description: Manual timer to control device(s)
+      selector:
+        entity:
+          domain: timer
     mqtt_topic:
       name: Topic
       description: Mqtt Topic to subscribe
@@ -42,6 +52,10 @@ trigger:
     value_template: |
       {{ value_json.Button1 is defined }}
     id: override
+  - platform: state
+    entity_id: !input timer
+    to: null
+    id: timer_state
 
 variables:
   action: |
@@ -59,6 +73,10 @@ action:
           - condition: template
             value_template: |
               {{ trigger.entity_id is search('(on|off)', ignorecase=true) }}
+          - not:
+              - condition: state
+                entity_id: !input timer
+                state: "active"
         sequence:
           - service: |
               {% if 'on' in trigger.entity_id %}
@@ -84,3 +102,15 @@ action:
             data: {}
             target:
               entity_id: !input switch_override
+      - conditions:
+          - condition: trigger
+            id: timer_state
+        sequence:
+          - service: |
+              {% if trigger.to_state.state == 'active' %}
+                switch.turn_on
+              {% else %}
+                switch.turn_off
+              {% endif %}
+            data: {}
+            target: !input switch_id
