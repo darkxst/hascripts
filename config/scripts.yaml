@@ -26,3 +26,44 @@ wait_for:
     target: "{{ switch_id }}"
   mode: queued
   icon: mdi:camera-timer
+time_state_check:
+  alias: check state
+  description: Check the state of entity, in case of missed time triggers
+  fields:
+    switch_id:
+      description: Switch entity to check the state of
+      example: input_boolean.fake_switch
+    time_on:
+      description: Time entity when turns on
+      example: input_datetime.dummy_on
+    time_off:
+      description: Time entity when turns off
+      example: input_datetime.dummy_off
+  sequence:
+    - variables:
+        exp_state: |
+          {% set ton = today_at(states(time_on)) %}
+          {% set toff = today_at(states(time_off)) %}
+          {% if ton > toff %}
+              {% if now() < toff %}
+                {% set ton = ton - timedelta(days=1) %}
+              {% else %}
+                {% set toff = toff + timedelta(days=1) %}
+              {% endif %} 
+          {% endif %}
+          {% if ton < now() and toff > now() %}
+              on 
+          {% else %}
+              off 
+          {% endif %}
+    - condition: "{{states(switch_id) != exp_state }}"
+    - service: "{{ switch_id.split('.')[0] ~ '.toggle' }}"
+      target:
+        entity_id: "{{ switch_id }}"
+    - service: logbook.log
+      data:
+        name: State Check
+        entity_id: "{{ switch_id }}"
+        message: "State mismatch detected, setting state to {{ exp_state | upper }}."
+  mode: single
+  icon: mdi:timer-check-outline
