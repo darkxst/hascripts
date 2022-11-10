@@ -32,7 +32,7 @@ blueprint:
 trigger_variables:
   ton: !input switch_on
   toff: !input switch_off
-  delta: 2
+  delta: 5
 
 trigger:
   - platform: time
@@ -85,3 +85,4 @@ action:
               time_on: !input switch_on
               time_off: !input switch_off
     default: []
+mode: queued

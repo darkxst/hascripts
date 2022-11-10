@@ -1,29 +1,29 @@
 wait_for:
   alias: wait for
-  description: "check if device is unavailable before sending state update"
+  description: check if device is unavailable before sending state update
   variables:
     svc: switch.turn_on
     switch_id: switch.entity
   sequence:
-  - choose:
-    - conditions: "{{ is_state(switch_id, 'unavailable')}}"
-      sequence:
-      - service: logbook.log
-        data:
-          name: "{{ switch_id }}"
-          message: "Switch {{ states(switch_id) }} unavailable"
-      - wait_for_trigger:
-        - platform: template
-          value_template: "{{ is_state(switch_id, 'on') }}"
-        - platform: template
-          value_template: "{{ is_state(switch_id, 'off') }}"
-      - service: logbook.log
-        data:
-          name: "{{ switch_id }}"
-          message: "Switch {{ states(switch_id) }} came back online, continuing"
-    default: []
-  - service: "{{ svc }}"
-    target: "{{ switch_id }}"
+    - choose:
+        - conditions: "{{ is_state(switch_id, 'unavailable')}}"
+          sequence:
+            - service: logbook.log
+              data:
+                name: "{{ switch_id }}"
+                message: Switch {{ states(switch_id) }} unavailable
+            - wait_for_trigger:
+                - platform: template
+                  value_template: "{{ is_state(switch_id, ''on'') }}"
+                - platform: template
+                  value_template: "{{ is_state(switch_id, 'off') }}"
+            - service: logbook.log
+              data:
+                name: "{{ switch_id }}"
+                message: "Switch {{ states(switch_id) }} came back online, continuing"
+      default: []
+    - service: "{{ svc }}"
+      target: "{{ switch_id }}"
   mode: queued
   icon: mdi:camera-timer
 time_state_check:
@@ -70,5 +70,5 @@ time_state_check:
         name: State Check
         entity_id: "{{ this.entity_id }}"
         message: "State mismatch detected, setting state to {{ exp_state | upper }} for {{pending_list}}."
-  mode: single
-  icon: mdi:timer-check-outline
+  mode: queued 
+  icon: mdi:timer-check-outline 
