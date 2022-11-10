@@ -1,0 +1,87 @@
+blueprint:
+  name: Scheduled Daily Cycle v3
+  description: >
+    Turn a device on daily based on input helpers.
+    Includes state check on home assistant startup
+  domain: automation
+  input:
+    switch_on:
+      name: Turn On
+      description: Time to switch device on. Helper entity name must include 'on'.
+      selector:
+        entity:
+          domain: input_datetime
+    switch_off:
+      name: Turn Off
+      description: Time to switch device off. Helper entity name must include 'off'.
+      selector:
+        entity:
+          domain: input_datetime
+    switch_id:
+      name: Device(s)
+      description: Device(s) to control (supports entities only)
+      selector:
+        target:
+          entity:
+            domain:
+              - input_boolean
+              - switch
+              - light
+              - binary_sensor
+
+trigger_variables:
+  ton: !input switch_on
+  toff: !input switch_off
+  delta: 2
+
+trigger:
+  - platform: time
+    at:
+      - !input switch_on
+      - !input switch_off
+    id: time
+  - platform: template
+    value_template: >
+      {{ now() >= today_at(states(ton)) + timedelta(minutes = delta) }}
+    id: statecheck
+  - platform: template
+    value_template: >
+      {{ now() >= today_at(states(toff)) + timedelta(minutes = delta) }}
+    id: statecheck
+  - platform: homeassistant
+    event: start
+    id: statecheck
+
+variables:
+  input_id: !input switch_id
+  input_ent: "{{ input_id.entity_id }}"
+  input_list: "{{ [input_ent] if input_ent is string else input_ent }}"
+
+action:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: time
+        sequence:
+          - repeat:
+              for_each: "{{ input_list }}"
+              sequence:
+                - service: >
+                    {% set sdomain = repeat.item.split('.')[0] %}
+                    {% if 'on' in trigger.entity_id %}
+                      {{ sdomain ~ '.turn_on' }}
+                    {% else %}
+                      {{ sdomain ~ '.turn_off' }}
+                    {% endif %}
+                  target:
+                    entity_id: "{{ repeat.item }}"
+      - conditions:
+          - condition: trigger
+            id: statecheck
+        sequence:
+          - service: script.time_state_check
+            data:
+              switch_id: "{{ input_id.entity_id }}"
+              time_on: !input switch_on
+              time_off: !input switch_off
+    default: []
