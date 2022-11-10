@@ -31,7 +31,7 @@ time_state_check:
   description: Check the state of entity, in case of missed time triggers
   fields:
     switch_id:
-      description: Switch entity to check the state of
+      description: Switch entity to check the state (string|list)
       example: input_boolean.fake_switch
     time_on:
       description: Time entity when turns on
@@ -56,14 +56,19 @@ time_state_check:
           {% else %}
               off 
           {% endif %}
-    - condition: "{{states(switch_id) != exp_state }}"
-    - service: "{{ switch_id.split('.')[0] ~ '.toggle' }}"
-      target:
-        entity_id: "{{ switch_id }}"
+        switch_list: "{{ [switch_id] if switch_id is string else switch_id }}"
+        pending_list: "{{ switch_list | reject('is_state', exp_state) | list }}"
+    - condition: "{{ pending_list | count >= 1 }}"
+    - repeat:
+        for_each: "{{ pending_list }}"
+        sequence:
+          - service: "{{ repeat.item.split('.')[0] ~ '.toggle' }}"
+            target:
+              entity_id: "{{ repeat.item }}"
     - service: logbook.log
       data:
         name: State Check
-        entity_id: "{{ switch_id }}"
-        message: "State mismatch detected, setting state to {{ exp_state | upper }}."
+        entity_id: "{{ this.entity_id }}"
+        message: "State mismatch detected, setting state to {{ exp_state | upper }} for {{pending_list}}."
   mode: single
   icon: mdi:timer-check-outline
