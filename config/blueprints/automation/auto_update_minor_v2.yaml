@@ -1,0 +1,137 @@
+blueprint:
+  name: Auto Update v2
+  description: >
+    Auto update on minor releases only, this will ignore major updates
+    that will likely contain breaking changes. It will also skip auto updates
+    of beta releases if you are on the Home Assistant beta channel.
+
+    For add-ons that rarely have breaking changes it is recommended to just use the auto-update option on the add-ons page.
+
+    Ported to new update template helpers
+
+    v0.2
+  domain: automation
+  input:
+    updates:
+      name: Addon Updates
+      description: Addons to update that use X.Y.0 versioning for major releases
+      default:
+        - update.mosquitto_broker_update
+        - update.terminal_ssh_update
+      selector:
+        entity:
+          multiple: true
+          domain: update
+    updates_2nd:
+      name: Addon Updates 2nd
+      description: Addons to update that use X.0.0 versioning for major releases
+      default:
+        - update.studio_code_server_update
+      selector:
+        entity:
+          multiple: true
+          domain: update
+    core:
+      name: Core Updates
+      description: |
+        Update core components that auto-restart on update these are run last
+      default:
+        - update.home_assistant_core_update
+      selector:
+        entity:
+          multiple: true
+          domain: update
+    update_time:
+      name: Update time
+      description: >-
+        Time to run updates, may cause a restart so best to run when quiet
+        i.e. during the night
+      default: "02:00:00"
+      selector:
+        time:
+trigger:
+  - platform: time
+    at: !input update_time
+
+condition: []
+
+variables:
+  list_data:
+    update_list: !input updates
+    update_list_2nd: !input updates_2nd
+    core_list: !input core
+  debug: false
+
+action:
+  - repeat:
+      for_each: |
+        {{ list_data.keys() | list }}
+      sequence:
+        - variables:
+            mode: |
+              {{ 'major' if repeat.item is search('2nd$')  else 'minor' }}
+            pending_list: |
+              {% set avail = states.update  | selectattr('state', 'eq', 'on')
+                | selectattr('entity_id', 'in', list_data.get(repeat.item,  None)) | list %}
+              {% set data = namespace(pending=[]) %}
+              {% for item in avail -%}
+                {%- set latest = state_attr(item.entity_id, 'latest_version') | version -%}
+                {% set diff = latest - state_attr(item.entity_id, 'installed_version') -%}
+                {% if not diff[mode] and not latest.beta -%}
+                  {% set data.pending = data.pending + [item.entity_id] -%}
+                {% endif -%}
+              {% endfor %}
+              {{data.pending}}
+        - service: logbook.log
+          data:
+            name: Auto-update
+            domain: update
+            entity_id: "{{ this.entity_id }}"
+            message: |
+              Processing {{ repeat.item }},
+              Pending: {{pending_list if pending_list | count >= 1 else 'None'}}
+        - condition: "{{ pending_list | count >= 1 }}"
+        - condition: "{{ not debug }}"
+        - service: update.install
+          data:
+            backup: >
+              {{ 'update.home_assistant_operating_system_update' not in
+              pending_list }}
+          target:
+            entity_id: "{{ pending_list }}"
+
+        - if:
+            - condition: template
+              value_template: '{{ repeat.item != "core_list" }}'
+          then:
+            - service: notify.persistent_notification
+              data:
+                message: no restart
+            - wait_template: |-
+                {{ ( states.update  | selectattr('state', 'eq', 'on') |
+                            selectattr('entity_id', 'in', pending_list ) | list | count ) < 1 }}
+              continue_on_timeout: true
+              timeout:
+                minutes: 30
+            - service: logbook.log
+              data:
+                name: Auto-update
+                domain: update
+                entity_id: "{{ this.entity_id }}"
+                message: |
+                  {% if wait.completed %}
+                    Completed updating: {{ pending_list }}
+                  {% else %}
+                    {{ pending_list }} Timeout
+                  {% endif %}
+          else:
+            - service: logbook.log
+              data:
+                name: Auto-update
+                domain: update
+                entity_id: "{{ this.entity_id }}"
+                message: Restarting for update {{ pending_list[0] }}
+            - wait_for_trigger:
+                - platform: homeassistant
+                  event: shutdown
+
