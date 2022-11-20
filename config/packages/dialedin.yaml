@@ -1,0 +1,112 @@
+script:
+  wait_for_qos:
+    alias: wait for qos
+    description: set switch state and check up to 3 times that it was applied
+    fields:
+      switch_id:
+        description: Switch entity(s) to check the state (string|list)
+        example: input_boolean.fake_switch
+        selector:
+          entity:
+            multiple: true
+      state:
+        description: new state to set on|off (string)
+        example: "on"
+        selector:
+          select:
+            options:
+              - "on"
+              - "off"
+    sequence:
+      - variables:
+          switch_list: "{{ [switch_id] if switch_id is string else switch_id }}"
+          new_state: "{{ 'on' if state is search('(on)', ignorecase=true) else 'off'}}"
+      - repeat:
+          until: >
+            {{ switch_list | reject('is_state', new_state) | list | count == 0 or repeat.index > 3 }}
+          sequence:
+            - variables:
+                pending_list: "{{ switch_list | reject('is_state', new_state) | list }}"
+            - repeat:
+                for_each: "{{ pending_list }}"
+                sequence:
+                  - service: "{{ states[repeat.item].domain ~ '.turn_' ~ new_state }}"
+                    target:
+                      entity_id: "{{ repeat.item }}"
+            - wait_template: "{{ pending_list | reject('is_state', new_state) | list | count == 0 }}"
+              timeout:
+                seconds: "{{ 15 * iif(repeat.index <= 3, repeat.index, 1) }}"
+            - choose:
+                - conditions: "{{ not wait.completed and repeat.index == 4 }}"
+                  sequence:
+                    - service: logbook.log
+                      data:
+                        name: "QoS Failure"
+                        entity_id: "{{ this.entity_id }}"
+                        message: State change of {{ pending_list }} failed
+      - service: logbook.log
+        data:
+          name: "Switch Qos"
+          entity_id: "{{ this.entity_id }}"
+          message: >
+            Switch {{ switch_list | select('is_state', new_state) | list }}
+            set to {{ new_state | upper }}
+    mode: queued
+    icon: mdi:checkbox-marked-circle-outline
+
+  time_state_check:
+    alias: check state
+    description: Check the state of entity, in case of missed time triggers
+    fields:
+      switch_id:
+        description: Switch entity(s) to check the state (string|list)
+        example: input_boolean.fake_switch
+        selector:
+          entity:
+            multiple: true
+      time_on:
+        description: Time entity when turns on
+        example: input_datetime.dummy_on
+        selector:
+          entity:
+            domain: input_datetime
+      time_off:
+        description: Time entity when turns off
+        example: input_datetime.dummy_off
+        selector:
+          entity:
+            domain: input_datetime
+    sequence:
+      - variables:
+          exp_state: |
+            {% set ton = today_at(states(time_on)) %}
+            {% set toff = today_at(states(time_off)) %}
+            {% if ton > toff %}
+                {% if now() < toff %}
+                  {% set ton = ton - timedelta(days=1) %}
+                {% else %}
+                  {% set toff = toff + timedelta(days=1) %}
+                {% endif %} 
+            {% endif %}
+            {% if ton < now() and toff > now() %}
+                on 
+            {% else %}
+                off 
+            {% endif %}
+          switch_list: "{{ [switch_id] if switch_id is string else switch_id }}"
+          pending_list: "{{ switch_list | reject('is_state', exp_state) | list }}"
+      - condition: "{{ pending_list | count >= 1 }}"
+      - repeat:
+          for_each: "{{ pending_list }}"
+          sequence:
+            - service: "{{ states[repeat.item].domain ~ '.toggle' }}"
+              target:
+                entity_id: "{{ repeat.item }}"
+      - service: logbook.log
+        data:
+          name: State Check
+          entity_id: "{{ this.entity_id }}"
+          message: "State mismatch detected, setting state to {{ exp_state | upper }} for {{pending_list}}."
+    mode: queued
+    icon: mdi:timer-check-outline
+-
