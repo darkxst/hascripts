@@ -9,8 +9,9 @@ blueprint:
 
     Ported to new update template helpers
 
-    v0.2
+    v0.2.1
   domain: automation
+  source_url: https://github.com/darkxst/hascripts/blob/main/config/blueprints/automation/auto_update_minor_v2.yaml
   input:
     updates:
       name: Addon Updates
@@ -22,8 +23,8 @@ blueprint:
         entity:
           multiple: true
           domain: update
-    updates_2nd:
-      name: Addon Updates 2nd
+    updates_major:
+      name: Addon Updates major
       description: Addons to update that use X.0.0 versioning for major releases
       default:
         - update.studio_code_server_update
@@ -58,7 +59,7 @@ condition: []
 variables:
   list_data:
     update_list: !input updates
-    update_list_2nd: !input updates_2nd
+    update_list_major: !input updates_major
     core_list: !input core
   debug: false
 
@@ -69,29 +70,30 @@ action:
       sequence:
         - variables:
             mode: |
-              {{ 'major' if repeat.item is search('2nd$')  else 'minor' }}
-            pending_list: |
-              {% set avail = states.update  | selectattr('state', 'eq', 'on')
-                | selectattr('entity_id', 'in', list_data.get(repeat.item,  None)) | list %}
+              {{ 'major' if repeat.item is search('major$')  else 'minor' }}
+            avail_list: |
+              {{ states.update  | selectattr('state', 'eq', 'on')
+                | selectattr('entity_id', 'in', list_data.get(repeat.item,  None))
+                | map(attribute='entity_id') | list }}
+            pending_list: >
               {% set data = namespace(pending=[]) %}
-              {% for item in avail -%}
-                {%- set latest = state_attr(item.entity_id, 'latest_version') | version -%}
-                {% set diff = latest - state_attr(item.entity_id, 'installed_version') -%}
+              {% for item in avail_list -%}
+                {% set latest = state_attr(item, 'latest_version') | version -%}
+                {% set diff = latest - state_attr(item, 'installed_version') -%}
                 {% if not diff[mode] and not latest.beta -%}
-                  {% set data.pending = data.pending + [item.entity_id] -%}
+                  {% set data.pending = data.pending + [item] -%}
                 {% endif -%}
               {% endfor %}
-              {{data.pending}}
+              {{ data.pending }}
+        - condition: "{{ pending_list | count >= 1 }}"
+        - condition: "{{ not debug }}"
         - service: logbook.log
           data:
             name: Auto-update
             domain: update
             entity_id: "{{ this.entity_id }}"
-            message: |
-              Processing {{ repeat.item }},
-              Pending: {{pending_list if pending_list | count >= 1 else 'None'}}
-        - condition: "{{ pending_list | count >= 1 }}"
-        - condition: "{{ not debug }}"
+            message: >
+              Processing {{ repeat.item }}, Pending: {{ pending_list }}
         - service: update.install
           data:
             backup: >
@@ -99,17 +101,13 @@ action:
               pending_list }}
           target:
             entity_id: "{{ pending_list }}"
-
         - if:
             - condition: template
               value_template: '{{ repeat.item != "core_list" }}'
           then:
-            - service: notify.persistent_notification
-              data:
-                message: no restart
-            - wait_template: |-
-                {{ ( states.update  | selectattr('state', 'eq', 'on') |
-                            selectattr('entity_id', 'in', pending_list ) | list | count ) < 1 }}
+            - alias: "No restart pending, wait for updates to complete"
+              wait_template: |
+                {{ pending_list | select('is_state', 'on') | list | count  < 1 }}
               continue_on_timeout: true
               timeout:
                 minutes: 30
@@ -118,12 +116,9 @@ action:
                 name: Auto-update
                 domain: update
                 entity_id: "{{ this.entity_id }}"
-                message: |
-                  {% if wait.completed %}
-                    Completed updating: {{ pending_list }}
-                  {% else %}
-                    {{ pending_list }} Timeout
-                  {% endif %}
+                message: >
+                  {{ 'Completed' if wait.completed else 'Timeout'}}
+                  {{ ' updating: ' ~ pending_list }}
           else:
             - service: logbook.log
               data:
@@ -134,4 +129,3 @@ action:
             - wait_for_trigger:
                 - platform: homeassistant
                   event: shutdown
-
