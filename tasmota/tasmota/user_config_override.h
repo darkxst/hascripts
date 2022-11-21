@@ -45,7 +45,8 @@
 // #undef  STA_PASS1
 // #define STA_PASS1         "YourWifiPassword"     // [Password1] Wifi password
 
-#if defined(FIRMWARE_USEE) || defined(FIRMWARE_DIALED)
+//#if defined(FIRMWARE_USEE) || defined(FIRMWARE_DIALED)
+#ifdef FIRMWARE_USEE
   //UseeLink Template
   #undef USER_TEMPLATE
   #define USER_TEMPLATE     "{\"NAME\":\"SM-SO301-AU\",\"GPIO\":[52,0,0,57,29,17,0,0,31,30,32,0,25],\"FLAG\":0,\"BASE\":18}"
@@ -56,6 +57,9 @@
 
   #define USER_BACKLOG      "Rule 1 ON"
   #define USER_RULE1         "ON button1#state==2 DO add1 1 ENDON ON var1#state|2 DO power0 1 BREAK ON var1#state DO power0 0 ENDON"
+
+  #undef OTA_URL
+  #define OTA_URL           "https://github.com/darkxst/hascripts/blob/main/config/tasmota/firmware-useelink.bin.gz?raw=true"  // [OtaUrl]
 #endif
 
 
@@ -78,13 +82,27 @@
   #define MQTT_USER         "mqtt"         // [MqttUser] Optional user
 
   #undef  MQTT_PASS
-  #define MQTT_PASS         "mqtts"         // [MqttPassword] Optional password
+  #define MQTT_PASS         "smqrt"         // [MqttPassword] Optional password
 #endif
 
-//Will need to override OTA for each build to pick up our firmware on update
-#ifdef FIRMWARE_USEE
+
+
+
+#ifdef FIRMWARE_ZBBRIDGE_DI
+  //pre-built for ZHA integration EZSP
+
+  //set OTA_URL and issue Updrade=1 command then we revert OTA_URL #needs testing
+   //do test #define USER_BACKLOG      "Rule 1 ON;Upgrade 1;OtaUrl 1"
+
   #undef OTA_URL
-  #define OTA_URL           "https://github.com/darkxst/hascripts/blob/main/config/tasmota/firmware-useelink.bin.gz?raw=true"  // [OtaUrl]
+  #define OTA_URL           "http://ota.tasmota.com/tasmota/release/tasmota-zbbridge.bin.gz"
+
+  #define USER_TEMPLATE     "{\"NAME\":\"ZHA ZBBridge\",\"GPIO\":[56,208,0,209,59,58,0,0,0,0,0,0,17],\"FLAG\":0,\"BASE\":18}"
+  #define MODULE            USER_MODULE
+
+ 
+  #define USER_RULE1        "ON System#Boot do TCPStart 8888 endon"
+  #define USER_BACKLOG      "Rule 1 ON;"
 #endif
 
 #endif  // _USER_CONFIG_OVERRIDE_H_
