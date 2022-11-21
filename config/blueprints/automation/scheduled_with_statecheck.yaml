@@ -1,9 +1,10 @@
 blueprint:
   name: Scheduled Daily Cycle v3
   description: >
-    Turn a device on daily based on input helpers.
+    Turn a device on daily based on input time helpers.
     Includes state check on home assistant startup
   domain: automation
+  source_url: https://github.com/darkxst/hascripts/blob/main/config/blueprints/automation/scheduled_with_statecheck.yaml
   input:
     switch_on:
       name: Turn On
@@ -67,12 +68,8 @@ action:
               for_each: "{{ input_list }}"
               sequence:
                 - service: >
-                    {% set sdomain = repeat.item.split('.')[0] %}
-                    {% if 'on' in trigger.entity_id %}
-                      {{ sdomain ~ '.turn_on' }}
-                    {% else %}
-                      {{ sdomain ~ '.turn_off' }}
-                    {% endif %}
+                    {{ states[repeat.item].domain ~ '.turn_' }}
+                    {{- iif('on' in trigger.entity_id, 'on', 'off') }}
                   target:
                     entity_id: "{{ repeat.item }}"
       - conditions:

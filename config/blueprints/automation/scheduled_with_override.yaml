@@ -6,6 +6,7 @@ blueprint:
 
     v0.0.2
   domain: automation
+  source_url: https://github.com/darkxst/hascripts/blob/main/config/blueprints/automation/scheduled_with_override.yaml
   input:
     switch_time:
       name: Times
