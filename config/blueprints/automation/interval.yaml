@@ -2,7 +2,7 @@ blueprint:
   name: Interval Power Cycle
   description: Turn a device based on a timed interval
   domain: automation
-  source_url: https://github.com/darkxst/hascripts/blob/main/config/blueprints/automation/dialed_lights_bp.yaml
+  source_url: https://github.com/darkxst/hascripts/blob/main/config/blueprints/automation/interval.yaml
   input:
     duration:
       name: Duration
