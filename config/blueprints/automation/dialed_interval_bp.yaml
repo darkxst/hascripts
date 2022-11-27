@@ -18,36 +18,52 @@ blueprint:
           domain: input_number
     condition_entity:
       name: Condition
-      description: Conditional, only run if entity ID is currently active
+      description: Only run if entity ID is currently active (Optional)
       default: {}
       selector:
         entity:
-          domain: switch
+          domain:
+            - switch
+            - input_boolean
     fan_id:
       name: Device(s)
       description: Device to control
       selector:
         target:
           entity:
-            domain: switch
+            domain:
+              - switch
+              - input_boolean
 variables:
   duration: !input duration
-  interval: !input interval
   condition_entity: !input condition_entity
-
+  fan: !input fan_id
+  fan_list: "{{ [fan.entity_id] if fan.entity_id is string else fan.entity_id }}"
+trigger_variables:
+  interval: !input interval
 trigger:
-  - platform: time_pattern
-    minutes: "/1"
+  - platform: template
+    value_template: "{{ now().minute % states(interval)|int == 0  }}"
 
 condition:
-  - condition: template
-    value_template: >-
-      {{ now().minute % states(interval)|int == 0 
-         and (states(condition_entity) == 'on' or states(condition_entity) == 'unknown')}}
+  - condition: or
+    conditions:
+      - "{{ condition_entity | length == 0 }}"
+      - "{{ states(condition_entity) == 'on' }}"
 
 action:
-  - service: switch.turn_on
-    target: !input fan_id
+  - repeat:
+      for_each: "{{ fan_list }}"
+      sequence:
+        - service: >
+            {{ states[repeat.item].domain ~ '.turn_on' }}
+          target:
+            entity_id: "{{ repeat.item }}"
   - delay: "{{ states(duration) | int * 60 }}"
-  - service: switch.turn_off
-    target: !input fan_id
+  - repeat:
+      for_each: "{{ fan_list }}"
+      sequence:
+        - service: >
+            {{ states[repeat.item].domain ~ '.turn_off' }}
+          target:
+            entity_id: "{{ repeat.item }}"
