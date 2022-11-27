@@ -43,7 +43,8 @@ trigger_variables:
   interval: !input interval
 trigger:
   - platform: template
-    value_template: "{{ now().minute % states(interval)|int == 0  }}"
+    value_template: >
+      {{ (now() | as_timestamp / 60 ) | int is divisibleby(states(interval)|int) }}
 
 condition:
   - condition: or
