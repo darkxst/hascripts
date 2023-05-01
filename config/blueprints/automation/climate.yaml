@@ -1,5 +1,5 @@
 blueprint:
-  name: Climate 
+  name: Climate
   description: Turn a device based on a temperature - heat only
   domain: automation
   source_url: https://github.com/darkxst/hascripts/blob/main/config/blueprints/automation/climate.yaml
@@ -27,17 +27,50 @@ blueprint:
       description: Device to control
       selector:
         entity:
-          domain: switch
+          domain:
+            - input_boolean
+            - switch
+    rgb_id:
+      name: RGB Device
+      description: Display current temperature via RGB LED (Optional)
+      default: {}
+      selector:
+        entity:
+          domain: light
+    rgbBrightness:
+      name: RGB Brightness
+      default: 160
+      selector:
+        number:
+          min: 0
+          max: 255
+          mode: slider
+    rgbDelta:
+      name: RGB Delta
+      description: Temperature range for display, this value will be added/substracted from the Set Temperature
+      default: 4
+      selector:
+        number:
+          min: 2
+          max: 10
+          unit_of_measurement: "°C"
 
 variables:
   Ts: !input setTemp
   Td: !input deltaTemp
-  Power: !input power_id
+
+  Rd: !input rgbDelta
+  rgb_target: !input rgb_id
+
+  PowerId: !input power_id
   debug: false
 
   TCurrent: "{{trigger.to_state.state | float}}"
   THigh: "{{states(Ts) | float}}"
   TLow: "{{THigh - states(Td) | float }}"
+
+  Hm: "{{ -240/(Rd*2) }}"
+  Hc: "{{ Hm * -(THigh + Rd) }}"
 
 trigger:
   - platform: state
@@ -48,45 +81,59 @@ condition: []
 
 action:
   - choose:
-    - conditions:
-      - condition: template
-        value_template: "{{debug}}"
-      sequence:
-        - service: notify.persistent_notification
-          data:
-            message: "climateT {{ TCurrent }} {{ states(Power) }}"
+      - conditions:
+          - condition: template
+            value_template: "{{debug}}"
+        sequence:
+          - service: notify.persistent_notification
+            data:
+              message: "climateT {{ TCurrent }} {{ states(PowerId) }}"
   - choose:
-    - conditions:
-      - condition: state
-        entity_id: !input power_id
-        state: "on"
-      - condition: template
-        value_template: "{{ TCurrent  > THigh }}"
-      sequence:
-        - choose:
-          - conditions:
-            - condition: template
-              value_template: "{{debug}}"
-            sequence:
-              - service: notify.persistent_notification
-                data:
-                  message: Temp high blueprint
-        - service: switch.turn_off
-          entity_id: !input power_id
-    - conditions:
-      - condition: state
-        entity_id: !input power_id
-        state: "off"
-      - condition: template
-        value_template: "{{ TCurrent <= TLow }}"
-      sequence:
-        - choose:
-          - conditions:
-            - condition: template
-              value_template: "{{debug}}"
-            sequence:
-              - service: notify.persistent_notification
-                data:
-                  message: Temp low blueprint
-        - service: switch.turn_on
-          entity_id: !input power_id
+      - conditions: "{{ rgb_target|length > 0 }}"
+        sequence:
+          service: light.turn_on
+          target:
+            entity_id: !input rgb_id
+          data:
+            brightness: !input rgbBrightness
+            hs_color: >
+              {% set h = Hm * TCurrent + Hc %}
+              {% set hlim = ([0,h,240]|sort)[1]|int %}
+              [ {{ hlim }}, 100 ]
+  - choose:
+      - conditions:
+          - condition: state
+            entity_id: !input power_id
+            state: "on"
+          - condition: template
+            value_template: "{{ TCurrent  > THigh }}"
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{debug}}"
+                sequence:
+                  - service: notify.persistent_notification
+                    data:
+                      message: Temp high blueprint
+          - service: >
+              {{ states[PowerId].domain ~ '.turn_off' }}
+            entity_id: !input power_id
+      - conditions:
+          - condition: state
+            entity_id: !input power_id
+            state: "off"
+          - condition: template
+            value_template: "{{ TCurrent <= TLow }}"
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{debug}}"
+                sequence:
+                  - service: notify.persistent_notification
+                    data:
+                      message: Temp low blueprint
+          - service: >
+              {{ states[PowerId].domain ~ '.turn_on' }}
+            entity_id: !input power_id
