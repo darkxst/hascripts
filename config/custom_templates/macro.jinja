@@ -1,0 +1,9 @@
+{% macro temp_to_hue(temp, mint, maxt) %}
+
+{% set m = 240/(mint - maxt ) %}
+{% set c = m*-maxt %}
+{% set h = m * temp + c %}
+{% set hlim = ([0,h,240]|sort)[1]|int %}
+{{ hlim }}
+
+{% endmacro %}
