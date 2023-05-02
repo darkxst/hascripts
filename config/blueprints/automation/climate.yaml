@@ -1,29 +1,31 @@
 blueprint:
   name: Climate
-  description: Control a device based on temperature - heat only
+  description: |
+    Climate Controller (heat only) - v0.1.2
+    Control a heater from temperature input with optional RGB display of current temp
   domain: automation
   source_url: https://github.com/darkxst/hascripts/blob/main/config/blueprints/automation/climate.yaml
   input:
     setTemp:
       name: Set Temparture
-      description: Set Point Temperature °C
+      description: Set Point Temperature input
       selector:
         entity:
           domain: input_number
     deltaTemp:
       name: Delta Temp
-      description: Temperature Delta °C (turn on below this)
+      description: Low temperature delta input (turn on heater below this). Recommend a value around ~2°C
       selector:
         entity:
           domain: input_number
     sensor:
       name: Temperature Sensor
-      description: sensor to monitor temperature in°C
+      description: sensor to monitor temperature
       selector:
         entity:
           domain: sensor
     power_id:
-      name: Heater Device(s)
+      name: Heater Device
       description: Device to control
       selector:
         entity:
@@ -33,7 +35,7 @@ blueprint:
     rgb_id:
       name: RGB Device
       description: Display current temperature via RGB LED (Optional)
-      default: {}
+      default: ""
       selector:
         entity:
           domain: light
@@ -58,18 +60,8 @@ blueprint:
 variables:
   Ts: !input setTemp
   Td: !input deltaTemp
-
-  Rd: !input rgbDelta
-  rgb_target: !input rgb_id
-
   PowerId: !input power_id
-
-  TCurrent: "{{trigger.to_state.state | float}}"
-  THigh: "{{states(Ts) | float}}"
-  TLow: "{{THigh - states(Td) | float }}"
-
-  Hm: "{{ -240/(Rd*2) }}"
-  Hc: "{{ Hm * -(THigh + Rd) }}"
+  rgb_target: !input rgb_id
 
 trigger:
   - platform: state
@@ -79,30 +71,34 @@ trigger:
 condition: []
 
 action:
+  - variables:
+      TCurrent: "{{ trigger.to_state.state | float }}"
+      THigh: "{{ states(Ts) | float }}"
+      TLow: "{{ THigh - states(Td) | float }}"
+      Action: >
+        {% if TCurrent  > THigh and is_state(PowerId, 'on') %}
+          off
+        {% elif TCurrent <= TLow and is_state(PowerId, 'off') %}
+          on
+        {% else %}
+          skip
+        {% endif %}
+  - choose:
+      - conditions: "{{ Action != 'skip' }}"
+        sequence:
+          - service: >
+              {{ states[PowerId].domain ~ '.turn_' ~ Action }}
+            entity_id: !input power_id
   - choose:
       - conditions: "{{ rgb_target|length > 0 }}"
+        alias: "map current temperature to hue and set RGB colour"
         sequence:
-          service: light.turn_on
-          target:
-            entity_id: !input rgb_id
-          data:
-            brightness: !input rgbBrightness
-            hs_color: >
-              {% set h = Hm * TCurrent + Hc %}
-              {% set hlim = ([0,h,240]|sort)[1]|int %}
-              [ {{ hlim }}, 100 ]
-  - choose:
-      - conditions:
-          - "{{ is_state(PowerId, 'on')}}"
-          - "{{ TCurrent  > THigh }}"
-        sequence:
-          - service: >
-              {{ states[PowerId].domain ~ '.turn_off' }}
-            entity_id: !input power_id
-      - conditions:
-          - "{{ is_state(PowerId, 'off')}}"
-          - "{{ TCurrent <= TLow }}"
-        sequence:
-          - service: >
-              {{ states[PowerId].domain ~ '.turn_on' }}
-            entity_id: !input power_id
+          - variables:
+              Rd: !input rgbDelta
+              hue: "{{ -240/(Rd*2) * (TCurrent - THigh - Rd) }}"
+              hlim: "{{ ([0,hue|round,240]|sort)[1] }}"
+          - service: light.turn_on
+            data:
+              brightness: !input rgbBrightness
+              hs_color: "[{{ hlim }}, 100]"
+              entity_id: !input rgb_id
