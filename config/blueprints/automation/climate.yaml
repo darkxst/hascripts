@@ -1,6 +1,6 @@
 blueprint:
   name: Climate
-  description: Turn a device based on a temperature - heat only
+  description: Control a device based on temperature - heat only
   domain: automation
   source_url: https://github.com/darkxst/hascripts/blob/main/config/blueprints/automation/climate.yaml
   input:
@@ -63,7 +63,6 @@ variables:
   rgb_target: !input rgb_id
 
   PowerId: !input power_id
-  debug: false
 
   TCurrent: "{{trigger.to_state.state | float}}"
   THigh: "{{states(Ts) | float}}"
@@ -81,14 +80,6 @@ condition: []
 
 action:
   - choose:
-      - conditions:
-          - condition: template
-            value_template: "{{debug}}"
-        sequence:
-          - service: notify.persistent_notification
-            data:
-              message: "climateT {{ TCurrent }} {{ states(PowerId) }}"
-  - choose:
       - conditions: "{{ rgb_target|length > 0 }}"
         sequence:
           service: light.turn_on
@@ -102,38 +93,16 @@ action:
               [ {{ hlim }}, 100 ]
   - choose:
       - conditions:
-          - condition: state
-            entity_id: !input power_id
-            state: "on"
-          - condition: template
-            value_template: "{{ TCurrent  > THigh }}"
+          - "{{ is_state(PowerId, 'on')}}"
+          - "{{ TCurrent  > THigh }}"
         sequence:
-          - choose:
-              - conditions:
-                  - condition: template
-                    value_template: "{{debug}}"
-                sequence:
-                  - service: notify.persistent_notification
-                    data:
-                      message: Temp high blueprint
           - service: >
               {{ states[PowerId].domain ~ '.turn_off' }}
             entity_id: !input power_id
       - conditions:
-          - condition: state
-            entity_id: !input power_id
-            state: "off"
-          - condition: template
-            value_template: "{{ TCurrent <= TLow }}"
+          - "{{ is_state(PowerId, 'off')}}"
+          - "{{ TCurrent <= TLow }}"
         sequence:
-          - choose:
-              - conditions:
-                  - condition: template
-                    value_template: "{{debug}}"
-                sequence:
-                  - service: notify.persistent_notification
-                    data:
-                      message: Temp low blueprint
           - service: >
               {{ states[PowerId].domain ~ '.turn_on' }}
             entity_id: !input power_id
